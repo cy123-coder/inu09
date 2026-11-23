@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { deleteUsedItem, getFavoriteState, getUsedItem, setUsedItemStatus, toggleFavorite, updateUsedItem } from '../../api/usedItems.js';
+import { deleteUsedItem, getFavoriteState, getUsedItem, setUsedItemStatus, toggleFavorite } from '../../api/usedItems.js';
 import { Button } from '../../components/Layout/Layout.styles.js';
 import { useAuth } from '../../hooks/AuthContext.jsx';
 import { deletePreviewPost, formatWon, getPreviewFavoriteIds, getPreviewUsedItems, setPreviewFavorite, timeAgo, updatePreviewPost } from '../../lib/formatters.js';
@@ -36,14 +36,7 @@ export default function UsedDetailPage() {
   const updateStatus = async (status) => {
     try { if (id.startsWith('preview-')) updatePreviewPost(id, { status }); else await setUsedItemStatus(id, status); await refresh(); } catch (cause) { window.alert(cause.message); }
   };
-  const editPost = async () => {
-    const nextTitle = window.prompt('상품명을 수정해 주세요.', item.title);
-    if (nextTitle === null || !nextTitle.trim()) return;
-    const nextDescription = window.prompt('설명을 수정해 주세요.', item.description || '');
-    if (nextDescription === null) return;
-    try { if (id.startsWith('preview-')) updatePreviewPost(id, { title: nextTitle.trim(), description: nextDescription.trim() }); else await updateUsedItem(id, { title: nextTitle.trim(), description: nextDescription.trim() }); await refresh(); }
-    catch (cause) { window.alert(cause.message); }
-  };
+  const editPost = () => navigate(`/new?edit=${encodeURIComponent(id)}&kind=used`);
   const removePost = async () => {
     if (!window.confirm('이 중고 공고를 삭제할까요?')) return;
     try { if (id.startsWith('preview-')) deletePreviewPost(id); else await deleteUsedItem(id); navigate('/home?kind=used'); }

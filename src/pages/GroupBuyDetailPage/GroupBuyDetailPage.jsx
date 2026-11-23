@@ -61,14 +61,7 @@ export default function GroupBuyDetailPage() {
     } catch (cause) { window.alert(cause.message || '참여 상태를 바꾸지 못했어요.'); }
     finally { setBusy(false); }
   };
-  const editPost = async () => {
-    const nextTitle = window.prompt('공구 제목을 수정해 주세요.', item.title);
-    if (nextTitle === null || !nextTitle.trim()) return;
-    const nextDescription = window.prompt('공구 설명을 수정해 주세요.', item.description || '');
-    if (nextDescription === null) return;
-    try { if (id.startsWith('preview-')) updatePreviewPost(id, { title: nextTitle.trim(), description: nextDescription.trim() }); else await updateGroupBuy(id, { title: nextTitle.trim(), description: nextDescription.trim() }); await refresh(); }
-    catch (cause) { window.alert(cause.message); }
-  };
+  const editPost = () => navigate(`/new?edit=${encodeURIComponent(id)}&kind=groupbuy`);
   const removePost = async () => {
     if (!window.confirm('이 공구 공고를 삭제할까요? 참여자가 있는 공고는 삭제할 수 없어요.')) return;
     try { if (id.startsWith('preview-')) deletePreviewPost(id); else await deleteGroupBuy(id); navigate('/home?kind=groupbuy'); }
