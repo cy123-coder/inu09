@@ -5,7 +5,7 @@ import { createUsedItem } from '../../api/usedItems.js';
 import { uploadPostImages } from '../../api/storage.js';
 import { FormField, PageTitle } from '../../components/Layout/Layout.styles.js';
 import { useAuth } from '../../hooks/AuthContext.jsx';
-import { categoryId, savePreviewPost } from '../../lib/formatters.js';
+import { categoryId, createLocalId, savePreviewPost } from '../../lib/formatters.js';
 import { isSupabaseConfigured } from '../../lib/supabaseClient.js';
 import { FormCard } from './NewPostPage.styles.js';
 
@@ -37,18 +37,18 @@ export default function NewPostPage() {
     setBusy(true); setError('');
     try {
       let images = [];
-      if (isSupabaseConfigured && files.length) images = await uploadPostImages(files, user.id);
+      if (isSupabaseConfigured && !user?.isDemo && files.length) images = await uploadPostImages(files, user.id);
       if (kind === 'groupbuy') {
         if (Number(minParticipants) > Number(maxParticipants)) throw new Error('최소 인원은 정원보다 클 수 없어요.');
         if (deadline && new Date(deadline) <= new Date()) throw new Error('모집 마감 시각은 현재보다 뒤여야 해요.');
         const payload = { title: title.trim(), description: description.trim(), category_id: categoryId(category, kind), images, min_participants: Number(minParticipants), max_participants: Number(maxParticipants), total_price: Number(totalPrice), price_per_person: perPerson, pickup_place: place.trim(), deadline: deadline ? new Date(deadline).toISOString() : null, status: 'open' };
-        if (isSupabaseConfigured) await createGroupBuy(payload);
-        else savePreviewPost({ ...payload, id: `preview-${crypto.randomUUID()}`, type: 'groupbuy', category_name: category, current_participants: 0, created_at: new Date().toISOString(), profiles: { nickname: '미리보기 사용자' } });
+        if (isSupabaseConfigured && !user?.isDemo) await createGroupBuy(payload);
+        else savePreviewPost({ ...payload, id: createLocalId(), type: 'groupbuy', author_id: user?.id, category_name: category, current_participants: 0, created_at: new Date().toISOString(), profiles: { nickname: user?.user_metadata?.nickname || '체험 사용자' } });
         navigate('/home?kind=groupbuy', { state: { notice: '공구 공고를 등록했어요.' } });
       } else {
         const payload = { title: title.trim(), description: description.trim(), category_id: categoryId(category, kind), images, price: Number(price), condition, place: place.trim(), status: 'selling' };
-        if (isSupabaseConfigured) await createUsedItem(payload);
-        else savePreviewPost({ ...payload, id: `preview-${crypto.randomUUID()}`, type: 'used', category_name: category, favorite_count: 0, created_at: new Date().toISOString(), profiles: { nickname: '미리보기 사용자' } });
+        if (isSupabaseConfigured && !user?.isDemo) await createUsedItem(payload);
+        else savePreviewPost({ ...payload, id: createLocalId(), type: 'used', author_id: user?.id, category_name: category, favorite_count: 0, created_at: new Date().toISOString(), profiles: { nickname: user?.user_metadata?.nickname || '체험 사용자' } });
         navigate('/home?kind=used', { state: { notice: '중고 공고를 등록했어요.' } });
       }
     } catch (cause) { setError(cause.message || '공고를 등록하지 못했어요.'); }
@@ -62,7 +62,7 @@ export default function NewPostPage() {
         {kind === 'groupbuy' ? <><div className="grid"><FormField>물품 총액 (원)<input type="number" min="1" required value={totalPrice} onChange={(event) => setTotalPrice(event.target.value)} placeholder="예: 120000" /></FormField><FormField>정원 (명)<input type="number" min="1" max="999" required value={maxParticipants} onChange={(event) => setMaxParticipants(event.target.value)} /></FormField></div><div className="grid"><FormField>최소 모집 인원<input type="number" min="1" max={maxParticipants} required value={minParticipants} onChange={(event) => setMinParticipants(event.target.value)} /></FormField><FormField>모집 마감<input type="datetime-local" required value={deadline} onChange={(event) => setDeadline(event.target.value)} /><span className="help">마감 전까지 참여자를 모집해요.</span></FormField></div><div className="price-preview"><span>정원 기준 예상 1인 금액 <span className="help">(원 단위 올림)</span></span><strong>{perPerson.toLocaleString('ko-KR')}원</strong></div></> : <FormField>판매 가격 (원)<input type="number" min="0" required value={price} onChange={(event) => setPrice(event.target.value)} placeholder="예: 8000" /></FormField>}
         <FormField>{kind === 'groupbuy' ? '수령 장소' : '거래 장소'}<input required maxLength={80} value={place} onChange={(event) => setPlace(event.target.value)} placeholder="예: 인천대학교 정문" /></FormField>
         <FormField>상세 설명<textarea required maxLength={1000} value={description} onChange={(event) => setDescription(event.target.value)} placeholder="상품 정보와 나누는 방법을 적어주세요." /></FormField>
-        <FormField>사진 (최대 5장)<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple onChange={(event) => { const selected = Array.from(event.target.files || []).slice(0, 5); if (selected.some((file) => file.size > 5 * 1024 * 1024)) { setError('사진 한 장은 5MB 이하여야 해요.'); setFiles([]); return; } setError(''); setFiles(selected); }} /><span className="upload">＋ 사진을 선택해 주세요</span><span className="file-list">{files.map((file) => file.name).join(' · ') || '사진은 선택 사항이에요.'}</span></FormField>
+        <FormField>사진 (최대 5장)<input type="file" accept="image/jpeg,image/png,image/webp,image/avif" multiple disabled={user?.isDemo} onChange={(event) => { const selected = Array.from(event.target.files || []).slice(0, 5); if (selected.some((file) => file.size > 5 * 1024 * 1024)) { setError('사진 한 장은 5MB 이하여야 해요.'); setFiles([]); return; } setError(''); setFiles(selected); }} /><span className="upload">{user?.isDemo ? '체험 계정에서는 사진을 저장할 수 없어요.' : '＋ 사진을 선택해 주세요'}</span><span className="file-list">{files.map((file) => file.name).join(' · ') || '사진은 선택 사항이에요.'}</span></FormField>
       </div>{error && <p className="error" role="alert">{error}</p>}<button className="submit" type="submit" disabled={busy}>{busy ? '등록 중…' : '공고 등록하기　→'}</button>
     </FormCard>
   </>;

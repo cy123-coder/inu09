@@ -1,4 +1,5 @@
 export const formatWon = (value) => `${Number(value ?? 0).toLocaleString('ko-KR')}원`;
+export const createLocalId = () => `preview-${globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2)}`;
 const categorySlugs = { 식품: 'food', 생활: 'daily', 전공책: 'textbook', 전자기기: 'digital', 의류: 'clothes', 기타: 'other' };
 export const categoryId = (name, kind) => `${kind}-${categorySlugs[name] || 'other'}`;
 export const formatDate = (value) => value ? new Date(value).toLocaleDateString('ko-KR', { month: 'long', day: 'numeric' }) : '날짜 미정';
@@ -40,6 +41,16 @@ export function getPreviewPosts() {
 export function savePreviewPost(post) {
   const posts = getPreviewPosts();
   window.localStorage.setItem('09inu-preview-posts', JSON.stringify([post, ...posts]));
+}
+
+export function updatePreviewPost(id, changes) {
+  const posts = getPreviewPosts().map((post) => post.id === id ? { ...post, ...changes } : post);
+  window.localStorage.setItem('09inu-preview-posts', JSON.stringify(posts));
+}
+
+export function deletePreviewPost(id) {
+  const posts = getPreviewPosts().filter((post) => post.id !== id);
+  window.localStorage.setItem('09inu-preview-posts', JSON.stringify(posts));
 }
 
 function readPreviewState() {

@@ -3,7 +3,7 @@ import styled from 'styled-components';
 export const Heading = styled.div`
   display:flex;align-items:flex-end;justify-content:space-between;margin:31px 0 16px;
   .eyebrow{font-size:10px;letter-spacing:1.2px;font-weight:900;color:${({ theme }) => theme.colors.blue}}h2{font-size:23px;letter-spacing:-.8px;margin:5px 0 3px}p{font-size:12px;color:${({ theme }) => theme.colors.mute};margin:0}
-  ${({ theme }) => theme.media.mobile}{margin:25px 0 13px;h2{font-size:21px}p{font-size:11px}}
+  ${({ theme }) => theme.media.mobile}{margin:25px 0 13px;h2{font-size:21px}p{font-size:11px}.desktop-post-action{display:none}}
 `;
 export const Tabs = styled.div`
   display:flex;gap:6px;border-bottom:1px solid ${({ theme }) => theme.colors.line};margin-bottom:16px;

@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import { deleteUsedItem, getFavoriteState, getUsedItem, setUsedItemStatus, toggleFavorite, updateUsedItem } from '../../api/usedItems.js';
 import { Button } from '../../components/Layout/Layout.styles.js';
 import { useAuth } from '../../hooks/AuthContext.jsx';
-import { formatWon, getPreviewFavoriteIds, getPreviewUsedItems, setPreviewFavorite, timeAgo } from '../../lib/formatters.js';
+import { deletePreviewPost, formatWon, getPreviewFavoriteIds, getPreviewUsedItems, setPreviewFavorite, timeAgo, updatePreviewPost } from '../../lib/formatters.js';
 import { isSupabaseConfigured } from '../../lib/supabaseClient.js';
 import { Back } from '../GroupBuyDetailPage/GroupBuyDetailPage.styles.js';
 import { Detail } from './UsedDetailPage.styles.js';
@@ -17,16 +17,16 @@ export default function UsedDetailPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const refresh = useCallback(async () => {
-    if (!isSupabaseConfigured) { setItem(getPreviewUsedItems().find((entry) => entry.id === id) ?? null); setFavorite(getPreviewFavoriteIds().includes(id)); return; }
-    try { const record = await getUsedItem(id); setItem(record); if (user) setFavorite(await getFavoriteState(id)); setError(''); }
+    if (!isSupabaseConfigured || (user?.isDemo && (id.startsWith('demo-') || id.startsWith('preview-')))) { setItem(getPreviewUsedItems().find((entry) => entry.id === id) ?? null); setFavorite(getPreviewFavoriteIds().includes(id)); return; }
+    try { const record = await getUsedItem(id); setItem(record); if (user?.isDemo) setFavorite(getPreviewFavoriteIds().includes(id)); else if (user) setFavorite(await getFavoriteState(id)); setError(''); }
     catch (cause) { setError(cause.message); setItem(getPreviewUsedItems().find((entry) => entry.id === id) ?? null); setFavorite(getPreviewFavoriteIds().includes(id)); }
   }, [id, user]);
   useEffect(() => { refresh(); }, [refresh]);
 
   const onFavorite = async () => {
     const preview = id.startsWith('demo-') || id.startsWith('preview-');
-    if (!user && isSupabaseConfigured && !preview) { navigate(`/login?next=${encodeURIComponent(`/used/${id}`)}`); return; }
-    if (isSupabaseConfigured && !preview) {
+    if ((!user || user.isDemo) && isSupabaseConfigured && !preview && !user?.isDemo) { navigate(`/login?next=${encodeURIComponent(`/used/${id}`)}`); return; }
+    if (isSupabaseConfigured && !preview && !user?.isDemo) {
       setBusy(true);
       try { await toggleFavorite(id, favorite); setFavorite(!favorite); await refresh(); }
       catch (cause) { window.alert(cause.message); }
@@ -34,19 +34,19 @@ export default function UsedDetailPage() {
     } else { const next = !favorite; setFavorite(next); setPreviewFavorite(id, next); }
   };
   const updateStatus = async (status) => {
-    try { await setUsedItemStatus(id, status); await refresh(); } catch (cause) { window.alert(cause.message); }
+    try { if (id.startsWith('preview-')) updatePreviewPost(id, { status }); else await setUsedItemStatus(id, status); await refresh(); } catch (cause) { window.alert(cause.message); }
   };
   const editPost = async () => {
     const nextTitle = window.prompt('상품명을 수정해 주세요.', item.title);
     if (nextTitle === null || !nextTitle.trim()) return;
     const nextDescription = window.prompt('설명을 수정해 주세요.', item.description || '');
     if (nextDescription === null) return;
-    try { await updateUsedItem(id, { title: nextTitle.trim(), description: nextDescription.trim() }); await refresh(); }
+    try { if (id.startsWith('preview-')) updatePreviewPost(id, { title: nextTitle.trim(), description: nextDescription.trim() }); else await updateUsedItem(id, { title: nextTitle.trim(), description: nextDescription.trim() }); await refresh(); }
     catch (cause) { window.alert(cause.message); }
   };
   const removePost = async () => {
     if (!window.confirm('이 중고 공고를 삭제할까요?')) return;
-    try { await deleteUsedItem(id); navigate('/home?kind=used'); }
+    try { if (id.startsWith('preview-')) deletePreviewPost(id); else await deleteUsedItem(id); navigate('/home?kind=used'); }
     catch (cause) { window.alert(cause.message); }
   };
 

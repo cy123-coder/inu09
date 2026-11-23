@@ -18,7 +18,7 @@ export default function LoginPage() {
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
-  useEffect(() => { if (user) navigate(next, { replace: true }); }, [user, next, navigate]);
+  useEffect(() => { if (user && !user.isDemo) navigate(next, { replace: true }); }, [user, next, navigate]);
 
   const submit = async (event) => {
     event.preventDefault(); setBusy(true); setError(''); setMessage('');

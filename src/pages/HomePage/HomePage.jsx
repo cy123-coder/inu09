@@ -29,7 +29,7 @@ export default function HomePage() {
   useEffect(() => { setVisible(6); }, [kind, category, query]);
   useEffect(() => {
     let alive = true;
-    if (!user || !isSupabaseConfigured) { setFavoriteIds(new Set(getPreviewFavoriteIds())); return undefined; }
+    if (!user || user.isDemo || !isSupabaseConfigured) { setFavoriteIds(new Set(getPreviewFavoriteIds())); return undefined; }
     listMyFavorites().then((items) => { if (alive) setFavoriteIds(new Set(items.map((item) => item.id))); }).catch(() => {});
     return () => { alive = false; };
   }, [user]);
@@ -56,7 +56,7 @@ export default function HomePage() {
     if (!user && isSupabaseConfigured && !preview) { navigate(`/login?next=${encodeURIComponent('/home?kind=used')}`); return; }
     const wasFavorite = favoriteIds.has(item.id);
     setFavoriteIds((current) => { const next = new Set(current); if (wasFavorite) next.delete(item.id); else next.add(item.id); return next; });
-    if (isSupabaseConfigured && !preview) {
+    if (isSupabaseConfigured && !preview && !user?.isDemo) {
       try { await toggleFavorite(item.id, wasFavorite); await refresh(); }
       catch (cause) { setFavoriteIds((current) => { const next = new Set(current); if (wasFavorite) next.add(item.id); else next.delete(item.id); return next; }); window.alert(cause.message); }
     } else setPreviewFavorite(item.id, !wasFavorite);
@@ -64,7 +64,7 @@ export default function HomePage() {
 
   return <>
     <Banner banners={banners} />
-    <Heading><div><span className="eyebrow">INU STUDENT MARKET</span><h2>{kind === 'groupbuy' ? '함께 사는 공구' : kind === 'used' ? '이웃의 중고거래' : '지금 올라온 공고'}</h2><p>인천대 이웃과 함께 나누는 알뜰한 거래를 찾아보세요.</p></div><Button $yellow as={Link} to={user || !isSupabaseConfigured ? '/new' : '/login?next=%2Fnew'}>+ 공고 올리기</Button></Heading>
+    <Heading><div><span className="eyebrow">INU STUDENT MARKET</span><h2>{kind === 'groupbuy' ? '함께 사는 공구' : kind === 'used' ? '이웃의 중고거래' : '지금 올라온 공고'}</h2><p>인천대 이웃과 함께 나누는 알뜰한 거래를 찾아보세요.</p></div><Button className="desktop-post-action" $yellow as={Link} to={user || !isSupabaseConfigured ? '/new' : '/login?next=%2Fnew'}>+ 공고 올리기</Button></Heading>
     <Tabs aria-label="공고 종류">{kinds.map((tab) => <button key={tab.key} type="button" aria-pressed={kind === tab.key} onClick={() => changeKind(tab.key)}>{tab.label}</button>)}</Tabs>
     <ListingLayout><div className="filters"><CategoryFilter value={category} onChange={setCategory} /></div><div className="content"><div className="content-head"><span>공고 <b>{items.length}</b>개</span><span>최신순 ↓</span></div>
       {error && <Notice>{error}<br />설정된 Supabase 프로젝트와 마이그레이션을 확인해 주세요.</Notice>}

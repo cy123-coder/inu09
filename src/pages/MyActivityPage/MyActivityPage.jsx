@@ -4,6 +4,7 @@ import { listMyGroupBuys, listMyParticipations } from '../../api/groupbuys.js';
 import { listMyFavorites, listMyUsedItems, toggleFavorite } from '../../api/usedItems.js';
 import PostCard from '../../components/PostCard/PostCard.jsx';
 import { Button, PageTitle } from '../../components/Layout/Layout.styles.js';
+import { getPreviewFavoriteIds, getPreviewGroupBuys, getPreviewParticipation, getPreviewUsedItems, setPreviewFavorite } from '../../lib/formatters.js';
 import { useAuth } from '../../hooks/AuthContext.jsx';
 import { Grid, ActivityTabs, Empty, Summary } from './MyActivityPage.styles.js';
 
@@ -15,6 +16,19 @@ export default function MyActivityPage() {
   const [error, setError] = useState('');
   useEffect(() => {
     if (!user) { setLoading(false); return undefined; }
+    if (user.isDemo) {
+      const groupBuys = getPreviewGroupBuys();
+      const usedItems = getPreviewUsedItems();
+      const favoriteIds = getPreviewFavoriteIds();
+      setData({
+        participating: groupBuys.filter((item) => getPreviewParticipation(item.id)),
+        favorites: usedItems.filter((item) => favoriteIds.includes(item.id)),
+        groupBuys: groupBuys.filter((item) => item.author_id === user.id),
+        usedItems: usedItems.filter((item) => item.author_id === user.id),
+      });
+      setLoading(false);
+      return undefined;
+    }
     let alive = true;
     Promise.all([listMyGroupBuys(), listMyUsedItems(), listMyFavorites(), listMyParticipations()])
       .then(([groupBuys, usedItems, favorites, participating]) => { if (alive) setData({ groupBuys, usedItems, favorites, participating }); })
@@ -27,6 +41,11 @@ export default function MyActivityPage() {
   if (!user) return <PageTitle><span className="eyebrow">MY INU</span><h1>내 활동</h1><p>참여한 공구와 찜한 상품을 확인하려면 로그인해 주세요.</p><Button $yellow as={Link} to="/login?next=%2Fme">인천대 이메일로 로그인</Button></PageTitle>;
   const listings = tab === 'participating' ? data.participating.map((item) => ({ item, kind: 'groupbuy' })) : tab === 'favorites' ? data.favorites.map((item) => ({ item, kind: 'used' })) : [...data.groupBuys.map((item) => ({ item, kind: 'groupbuy' })), ...data.usedItems.map((item) => ({ item, kind: 'used' }))];
   const removeFavorite = async (item) => {
+    if (user.isDemo) {
+      setPreviewFavorite(item.id, false);
+      setData((current) => ({ ...current, favorites: current.favorites.filter((entry) => entry.id !== item.id) }));
+      return;
+    }
     try { await toggleFavorite(item.id, true); setData((current) => ({ ...current, favorites: current.favorites.filter((entry) => entry.id !== item.id) })); }
     catch (cause) { window.alert(cause.message); }
   };

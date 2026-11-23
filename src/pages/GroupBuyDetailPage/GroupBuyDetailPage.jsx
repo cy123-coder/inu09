@@ -4,7 +4,7 @@ import { deleteGroupBuy, getGroupBuy, getParticipationState, joinGroupBuy, leave
 import { Button } from '../../components/Layout/Layout.styles.js';
 import Gauge from '../../components/Gauge/Gauge.jsx';
 import { useAuth } from '../../hooks/AuthContext.jsx';
-import { formatDate, formatWon, getPreviewGroupBuys, getPreviewParticipation, setPreviewParticipation, timeAgo } from '../../lib/formatters.js';
+import { deletePreviewPost, formatDate, formatWon, getPreviewGroupBuys, getPreviewParticipation, setPreviewParticipation, timeAgo, updatePreviewPost } from '../../lib/formatters.js';
 import { isSupabaseConfigured, supabase } from '../../lib/supabaseClient.js';
 import { Back, Detail } from './GroupBuyDetailPage.styles.js';
 
@@ -18,11 +18,22 @@ export default function GroupBuyDetailPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const refresh = useCallback(async () => {
-    if (!isSupabaseConfigured) { setItem(getPreviewGroupBuys().find((entry) => entry.id === id) ?? null); setJoined(getPreviewParticipation(id)); setLoading(false); return; }
+    if (!isSupabaseConfigured || (user?.isDemo && (id.startsWith('demo-') || id.startsWith('preview-')))) { setItem(getPreviewGroupBuys().find((entry) => entry.id === id) ?? null); setJoined(getPreviewParticipation(id)); setLoading(false); return; }
+    if (user?.isDemo) {
+      try {
+        const record = await getGroupBuy(id);
+        const localJoined = getPreviewParticipation(id);
+        setItem({ ...record, current_participants: (record.current_participants || 0) + (localJoined ? 1 : 0) });
+        setJoined(localJoined);
+        setError('');
+      } catch (cause) { setError(cause.message); setItem(getPreviewGroupBuys().find((entry) => entry.id === id) ?? null); setJoined(getPreviewParticipation(id)); }
+      finally { setLoading(false); }
+      return;
+    }
     try { const [record, participation] = await Promise.all([getGroupBuy(id), getParticipationState(id)]); setItem(record); setJoined(participation); setError(''); }
     catch (cause) { setError(cause.message); setItem(getPreviewGroupBuys().find((entry) => entry.id === id) ?? null); setJoined(getPreviewParticipation(id)); }
     finally { setLoading(false); }
-  }, [id]);
+  }, [id, user]);
   useEffect(() => { setLoading(true); refresh(); }, [refresh]);
   useEffect(() => {
     if (!supabase || !id) return undefined;
@@ -32,13 +43,14 @@ export default function GroupBuyDetailPage() {
 
   const participate = async () => {
     const preview = id.startsWith('demo-') || id.startsWith('preview-');
-    if (!user && isSupabaseConfigured && !preview) { navigate(`/login?next=${encodeURIComponent(`/groupbuys/${id}`)}`); return; }
-    if (!isSupabaseConfigured || preview) {
+    if ((!user || user.isDemo) && isSupabaseConfigured && !preview && !user?.isDemo) { navigate(`/login?next=${encodeURIComponent(`/groupbuys/${id}`)}`); return; }
+    if (!isSupabaseConfigured || preview || user?.isDemo) {
       const current = item.current_participants ?? 0;
       if (!joined && current >= (item.max_participants ?? 1)) { window.alert('모집 정원이 가득 찼어요.'); return; }
       setPreviewParticipation(id, !joined);
       setJoined(!joined);
-      await refresh();
+      if (user?.isDemo && !preview) setItem((currentItem) => ({ ...currentItem, current_participants: Math.max(0, (currentItem?.current_participants ?? 0) + (!joined ? 1 : -1)) }));
+      else await refresh();
       return;
     }
     setBusy(true);
@@ -54,17 +66,17 @@ export default function GroupBuyDetailPage() {
     if (nextTitle === null || !nextTitle.trim()) return;
     const nextDescription = window.prompt('공구 설명을 수정해 주세요.', item.description || '');
     if (nextDescription === null) return;
-    try { await updateGroupBuy(id, { title: nextTitle.trim(), description: nextDescription.trim() }); await refresh(); }
+    try { if (id.startsWith('preview-')) updatePreviewPost(id, { title: nextTitle.trim(), description: nextDescription.trim() }); else await updateGroupBuy(id, { title: nextTitle.trim(), description: nextDescription.trim() }); await refresh(); }
     catch (cause) { window.alert(cause.message); }
   };
   const removePost = async () => {
     if (!window.confirm('이 공구 공고를 삭제할까요? 참여자가 있는 공고는 삭제할 수 없어요.')) return;
-    try { await deleteGroupBuy(id); navigate('/home?kind=groupbuy'); }
+    try { if (id.startsWith('preview-')) deletePreviewPost(id); else await deleteGroupBuy(id); navigate('/home?kind=groupbuy'); }
     catch (cause) { window.alert(cause.message); }
   };
   const closePost = async () => {
     if (!window.confirm('모집을 종료할까요? 종료 후에는 새로운 참여를 받을 수 없어요.')) return;
-    try { await updateGroupBuy(id, { status: 'closed' }); await refresh(); }
+    try { if (id.startsWith('preview-')) updatePreviewPost(id, { status: 'closed' }); else await updateGroupBuy(id, { status: 'closed' }); await refresh(); }
     catch (cause) { window.alert(cause.message); }
   };
 
